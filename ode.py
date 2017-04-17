@@ -101,23 +101,25 @@ class Model():
             print('input: {}, accuracy: {}'.format(point, acc))
             self.testresults.append((point,acc))
 
-#let dy/dx = 5*y + 3*x
-#y = 3/25 * (-5*x + np.exp(5*x) - 1)
+#let dy/dx = exp(-x/5)cos(x) - 1/(5y)
+#y = exp(-x/5)sin(x)
 
-def data():
+def data(low=-1, up=2, points=50):
     x = []
     # [x.append[i] for i in range(-2, 0.1, 2)]
     # num_samp = 10
-    x = np.linspace(-1,4,50)
+    x = np.linspace(low,up,points)
     data = []
     for x in x:
-        y = (3/25)*(-5*x + np.exp(5*x)-1)
+        # y = (3/25)*(-5*x + np.exp(5*x)-1)
+        y = np.exp(-x/5)*np.sin(x)
         #let y(0) = 0
-        dy = 5*y + 3*x
+        # dy = 5*y + 3*x
+        dy = np.exp(-x/5)*np.cos(x) - 1/(5*y)
         yield x, y, dy
 
 sess = tf.Session()
-model = Model(sess, data, nEpochs=100, learning_rate=1e-2, lambduh=1e-4)
+model = Model(sess, data, nEpochs=200, learning_rate=1e-2, lambduh=1e-4)
 model.train_init()
 model.train()
 
@@ -132,7 +134,7 @@ model.eval(test)
 
 # generate manifold and plot
 
-x= np.linspace(-1, 4, 20)
+x= np.linspace(-3, 4, 30)
 
 test = []
 for a in x:
@@ -147,7 +149,7 @@ fig, ax = plt.subplots(1,1)
 fig.set_size_inches(5, 3)
 x = [x[0] for x in test]
 dy = [x[1] for x in test]
-plt.plot(x, dy, 'o', x, dy, '-', np.array(examples), np.array(targets), '.')
+plt.plot(x, dy, 'o', x, dy, '-', np.array(examples), np.array(targets), '-')
 # plt.xlim([-1, 2])
 # plt.ylim([-10, 25])
 ax.set_xlabel('x')
