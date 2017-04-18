@@ -68,7 +68,7 @@ class Model():
         self.l2_penalty = tf.reduce_sum(tf.get_collection('l2'))
         self.loss = self.mse + self.lambduh*self.l2_penalty
         
-        self.accuracy = (self.dyhat - self.dy)/self.dy
+        self.accuracy = tf.reduce_sum(tf.abs((self.dyhat - self.dy)/self.dy))
 
 
     def train_init(self):
@@ -86,7 +86,8 @@ class Model():
 
     def train(self):
         for _ in range(self.nEpochs):
-            for x, y, dy in self.data():
+            # training set is 30
+            for x, y, dy in list(self.data())[:30]:
                 self.train_iter(x, y, dy)
 
     def infer(self, x):
@@ -104,11 +105,11 @@ class Model():
 #let dy/dx = exp(-x/5)cos(x) - 1/(5y)
 #y = exp(-x/5)sin(x)
 
-def data(low=-1, up=2, points=50):
+def data():
     x = []
     # [x.append[i] for i in range(-2, 0.1, 2)]
     # num_samp = 10
-    x = np.linspace(low,up,points)
+    x = np.linspace(-1,4,50)
     data = []
     for x in x:
         # y = (3/25)*(-5*x + np.exp(5*x)-1)
@@ -134,7 +135,7 @@ model.eval(test)
 
 # generate manifold and plot
 
-x= np.linspace(-3, 4, 30)
+x= np.linspace(-3, 4, 50)
 
 test = []
 for a in x:
@@ -149,7 +150,7 @@ fig, ax = plt.subplots(1,1)
 fig.set_size_inches(5, 3)
 x = [x[0] for x in test]
 dy = [x[1] for x in test]
-plt.plot(x, dy, 'o', x, dy, '-', np.array(examples), np.array(targets), '-')
+plt.plot(x, dy, '.', x, dy, '-', np.array(examples), np.array(targets), '-')
 # plt.xlim([-1, 2])
 # plt.ylim([-10, 25])
 ax.set_xlabel('x')
@@ -170,7 +171,7 @@ fig.set_size_inches(5, 3)
 yval = [x[0] for x in model.testresults]
 error = [x[1] for x in model.testresults]
 plt.plot(yval, error, 'or')
-print(model.testresults)
+# print(model.testresults)
 
 
 # plt.xlim([0, 1])
