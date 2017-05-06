@@ -42,7 +42,7 @@ class Model():
             with tf.variable_scope('model', reuse=False):
                 # input
                 inputs = tf.expand_dims(tf.stack([x,y]), 0)
-
+                # inputs = tf.stack([x,y])
                 # NOTE: elu activation function on 3 layers returns NaN losses ??
 
                 layer1 = slim.fully_connected(
@@ -51,7 +51,7 @@ class Model():
                     activation_fn=tf.nn.elu,
                     variables_collections=['model'],
                     scope='fc1')
-                
+                # layer1 = tf.nn.lrn(layer1)
                 out = slim.fully_connected(
                     layer1,
                     1,
@@ -81,7 +81,7 @@ class Model():
         NN_y2 = tf.gradients(NN_y[0], [self.y])
 
         # x and y terms of gradient
-        grad_x2 = tf.square(-np.pi)*self.y*tf.sin(np.pi*self.x) + \
+        grad_x2 = -tf.square(np.pi)*self.y*tf.sin(np.pi*self.x) + \
                 (tf.square(self.y)-self.y)*( (tf.square(self.x)-self.x)*NN_x2[0] + (4*self.x - 2)*NN_x[0] + 2*NNout)
 
         grad_y2 = (tf.square(self.x)-self.x)*( (tf.square(self.y)-self.y)*NN_y2[0] + (4*self.y-2)*NN_y[0] + 2*NNout)
@@ -89,11 +89,11 @@ class Model():
         # predicted gradient
         self.dzhat = tf.add(grad_x2, grad_y2)
         
-        self.mse = tf.abs((self.dzhat - self.dz))     
+        self.mse = tf.square((self.dzhat - self.dz))     
         self.l2_penalty = tf.reduce_sum(tf.get_collection('l2'))
         self.loss = self.mse + self.lambduh*self.l2_penalty
         
-        self.error = tf.reduce_sum(tf.abs(self.zhat - self.z))
+        self.error = tf.reduce_sum((self.zhat - self.z))
 
 
     def train_init(self):   
@@ -149,7 +149,7 @@ def data():
             yield x, y, z, dz
 
 sess = tf.Session()
-model = Model(sess, data, nEpochs=20, learning_rate=1e-3, lambduh=1e-4)
+model = Model(sess, data, nEpochs=100, learning_rate=1e-3, lambduh=1e-4)
 model.train_init()
 model.train()
 
@@ -245,8 +245,8 @@ bx.plot_surface(xx, yy, error)
 # plt.ylim([-10, 25])
 bx.set_xlabel('x')
 bx.set_ylabel('y')
-bx.set_zlabel('error of z (%)')
-plt.title('Error Plot, AvgError: {:.2f}%'.format(np.mean(error)))
+bx.set_zlabel('error of z')
+plt.title('Error Plot, AvgError: {:.2f}'.format(np.mean(np.abs(error))))
 plt.tight_layout()
 plt.savefig('errorplot.pdf', format='pdf', bbox_inches='tight')
 
