@@ -8,7 +8,7 @@ from matplotlib.mlab import griddata
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import pdb
-
+import scipy.optimize
 # import tensorflow.contrib.slim as slim
 
 
@@ -45,20 +45,29 @@ class Model():
                 # inputs = tf.stack([x,y])
                 # NOTE: elu activation function on 3 layers returns NaN losses ??
 
-                layer1 = slim.fully_connected(
+                net = slim.fully_connected(
                     inputs,
                     10,
-                    activation_fn=tf.nn.elu,
+                    activation_fn=tf.nn.sigmoid,
+                    weights_regularizer=slim.l2_regularizer(0.001),
                     variables_collections=['model'],
                     scope='fc1')
+                net = slim.fully_connected(
+                    net,
+                    10,
+                    activation_fn=tf.nn.sigmoid,
+                    weights_regularizer=slim.l2_regularizer(0.001),
+                    variables_collections=['model'],
+                    scope='fc2')
                 # layer1 = tf.nn.lrn(layer1)
-                out = slim.fully_connected(
-                    layer1,
+                net = slim.fully_connected(
+                    net,
                     1,
                     activation_fn=None,
+                    weights_regularizer=slim.l2_regularizer(0.001),
                     variables_collections=['model'],
                     scope='out')
-                return out
+                return net
   
         # NNout = multilayer_perceptron(self.x, self.y, w, b)
         NNout = NeuralNet(self.x, self.y)
@@ -90,7 +99,7 @@ class Model():
         self.dzhat = tf.add(grad_x2, grad_y2)
         
         self.mse = tf.square((self.dzhat - self.dz))     
-        self.l2_penalty = tf.reduce_sum(tf.get_collection('l2'))
+        self.l2_penalty = tf.reduce_sum(tf.losses.get_regularization_losses())
         self.loss = self.mse + self.lambduh*self.l2_penalty
         
         self.error = tf.reduce_sum((self.zhat - self.z))
@@ -149,7 +158,7 @@ def data():
             yield x, y, z, dz
 
 sess = tf.Session()
-model = Model(sess, data, nEpochs=100, learning_rate=1e-3, lambduh=1e-4)
+model = Model(sess, data, nEpochs=80, learning_rate=1e-3, lambduh=1e-4)
 model.train_init()
 model.train()
 
@@ -181,8 +190,8 @@ test = np.array(test)
 xexamples, yexamples, zexamples, targets = zip(*list(data()))
 
 fig = plt.figure()
-ax = fig.add_subplot(111,projection='3d')
-
+ax = fig.add_subplot(211,projection='3d')
+ay = fig.add_subplot(212,projection='3d')
 # fig.set_size_inches(5, 3)
 # x = [x[0] for x in test]
 # y = [x[1] for x in test]
@@ -196,14 +205,16 @@ zexamples = np.reshape(zexamples, np.shape(xx))
 # plt.scatter(x, np.array(xexamples), np.array(yexamples), np.array(zexamples))
 # ax.plot_surface(xx, yy, z)
 ax.plot_surface(xx, yy, zexamples, label='actual')
-ax.plot_surface(xx, yy, z, label='neural net')
+ay.plot_surface(xx, yy, z, label='neural net')
 # plt.xlim([-1, 2])
 # plt.ylim([-10, 25])
 ax.set_xlabel('x')
 ax.set_ylabel('y')
-ax.set_zlabel('z')
-plt.title('Actual vs. Neural Net Solution')
-plt.tight_layout()
+ax.set_zlabel('z (Actual)')
+ay.set_xlabel('x')
+ay.set_ylabel('y')
+ay.set_zlabel('z (Neural Net)')
+plt.suptitle('Actual vs. Neural Net Solution')
 plt.savefig('plot.pdf', format='pdf', bbox_inches='tight')
 
 
@@ -213,7 +224,7 @@ x = []
 [x.append(i) for i in range(len(model.loss_tracker))]
 ay.set_xlabel('batch number')
 ay.set_ylabel('MSE Loss')
-plt.title('Loss during training')
+plt.suptitle('Loss during training')
 plt.plot(x, model.loss_tracker)
 
 # print(np.shapez(model.testresults))
@@ -246,9 +257,18 @@ bx.plot_surface(xx, yy, error)
 bx.set_xlabel('x')
 bx.set_ylabel('y')
 bx.set_zlabel('error of z')
-plt.title('Error Plot, AvgError: {:.2f}'.format(np.mean(np.abs(error))))
+plt.title('Error Plot, Average Error: {:.7f}, Max Error: {:.7f}'.format(np.mean(np.absolute(error)) , 
+                                                                        np.max(np.absolute(error))))
 plt.tight_layout()
 plt.savefig('errorplot.pdf', format='pdf', bbox_inches='tight')
+
+plt.figure()
+cp = plt.contourf(xx, yy, error)
+plt.title('Error Plot, Average Error: {:.7f}, Max Error: {:.7f}'.format(np.mean(np.absolute(error)) , 
+                                                                        np.max(np.absolute(error))))
+plt.xlabel('x')
+plt.ylabel('y')
+
 
 plt.show()
 
