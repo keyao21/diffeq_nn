@@ -23,25 +23,27 @@ import scipy.optimize
 #         return variable
     
 class Model():
-    def __init__(self, sess, data, nEpochs, learning_rate, lambduh):
+    def __init__(self, sess, data, nEpochs, learning_rate, lambduh, batch_size):
         self.sess = sess
         self.data = data
         self.nEpochs = nEpochs
         self.learning_rate = learning_rate
         self.lambduh = lambduh
+        self.batch_size = batch_size
         self.build_model()
         
     def build_model(self):
-        self.x = tf.placeholder(tf.float32, shape=[])
-        self.y = tf.placeholder(tf.float32, shape=[])
-        self.z = tf.placeholder(tf.float32, shape=[])
-        self.dz = tf.placeholder(tf.float32, shape=[])
+        self.x = tf.placeholder(tf.float32, shape=[None])
+        self.y = tf.placeholder(tf.float32, shape=[None])
+        self.z = tf.placeholder(tf.float32, shape=[None])
+        self.dz = tf.placeholder(tf.float32, shape=[None])
 
         # tf.slim
         def NeuralNet(x, y):
             with tf.variable_scope('model', reuse=False):
                 # input
-                inputs = tf.expand_dims(tf.stack([x,y]), 0)
+                #inputs = tf.expand_dims(tf.stack([x,y]), 0)
+                inputs = tf.transpose([x,y])
                 # inputs = tf.stack([x,y])
                 # NOTE: elu activation function on 3 layers returns NaN losses ??
 
@@ -71,7 +73,7 @@ class Model():
   
         # NNout = multilayer_perceptron(self.x, self.y, w, b)
         NNout = NeuralNet(self.x, self.y)
-        NNout = tf.reshape(NNout, [])
+        NNout = tf.squeeze(NNout)
 
 
         self.zhat = self.y*tf.sin(np.pi*self.x) + self.x*(self.x - 1)*self.y*(self.y-1)*NNout
@@ -123,19 +125,29 @@ class Model():
         for _ in range(self.nEpochs):
             # training set is 30
             loss = 0
+            count = 0
+            batch = [[],[],[],[]];
             for x, y, z, dz in self.data():
-                loss += self.train_iter(x, y, z, dz)
+                batch[0].append(x);
+                batch[1].append(y);
+                batch[2].append(z);
+                batch[3].append(dz);
+                count += 1;
+                if (count == self.batch_size):
+                    loss += self.train_iter(batch[0], batch[1], batch[2], batch[3])
+                    count = 0
+                    batch = [[],[],[],[]];
             self.loss_tracker.append(loss/len(list(self.data())))
 
     def infer(self, x, y):
-        return self.sess.run([self.x, self.y, self.zhat, self.dzhat], feed_dict={self.x : x, self.y : y})
+        return self.sess.run([self.x, self.y, self.zhat, self.dzhat], feed_dict={self.x : [x], self.y : [y]})
 
     def eval(self, test):
         self.testresults = []
         print("Testing Accuracy:")
         for test in test:
-            pointx, pointy, error = sess.run([self.x, self.y, self.error], feed_dict={self.x: test[0],
-                                      self.y: test[1], self.z : test[2], self.dz : test[3]})
+            pointx, pointy, error = sess.run([self.x, self.y, self.error], feed_dict={self.x: [test[0]],
+                                      self.y: [test[1]], self.z : [test[2]], self.dz : [test[3]]})
             print('input: ({},{}) , error: {}'.format(pointx, pointy, error))
             self.testresults.append((pointx,pointy,error))
 
@@ -158,7 +170,7 @@ def data():
             yield x, y, z, dz
 
 sess = tf.Session()
-model = Model(sess, data, nEpochs=80, learning_rate=1e-3, lambduh=1e-4)
+model = Model(sess, data, nEpochs=80, learning_rate=1e-3, lambduh=1e-4, batch_size = 5)
 model.train_init()
 model.train()
 
