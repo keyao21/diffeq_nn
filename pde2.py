@@ -9,18 +9,8 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import pdb
 import scipy.optimize
-# import tensorflow.contrib.slim as slim
 
 
-# def model_variable(shape, name):
-#         variable = tf.get_variable(name=name,
-#                                    dtype=tf.float32,
-#                                    shape=shape,
-#                                    initializer=tf.random_normal_initializer(mean=5, stddev=5)
-#         )
-#         tf.add_to_collection('model_variables', variable)
-#         tf.add_to_collection('l2', tf.reduce_sum(tf.pow(variable,2)))
-#         return variable
     
 class Model():
     def __init__(self, sess, data, nEpochs, learning_rate, lambduh, batch_size):
@@ -51,14 +41,14 @@ class Model():
                     inputs,
                     10,
                     activation_fn=tf.nn.sigmoid,
-                    weights_regularizer=slim.l2_regularizer(0.001),
+                    weights_regularizer=slim.l2_regularizer(self.lambduh),
                     variables_collections=['model'],
                     scope='fc1')
                 net = slim.fully_connected(
                     net,
                     10,
                     activation_fn=tf.nn.sigmoid,
-                    weights_regularizer=slim.l2_regularizer(0.001),
+                    weights_regularizer=slim.l2_regularizer(self.lambduh),
                     variables_collections=['model'],
                     scope='fc2')
                 # layer1 = tf.nn.lrn(layer1)
@@ -66,7 +56,7 @@ class Model():
                     net,
                     1,
                     activation_fn=None,
-                    weights_regularizer=slim.l2_regularizer(0.001),
+                    weights_regularizer=slim.l2_regularizer(self.lambduh),
                     variables_collections=['model'],
                     scope='out')
                 return net
@@ -100,16 +90,16 @@ class Model():
         # predicted gradient
         self.dzhat = tf.add(grad_x2, grad_y2)
         
-        self.mse = tf.square((self.dzhat - self.dz))     
+        self.mse = tf.reduce_sum(tf.square((self.dzhat - self.dz)))
         self.l2_penalty = tf.reduce_sum(tf.losses.get_regularization_losses())
         self.loss = self.mse + self.lambduh*self.l2_penalty
         
-        self.error = tf.reduce_sum((self.zhat - self.z))
+        self.error = tf.reduce_sum(tf.square(self.zhat - self.z))
 
 
     def train_init(self):   
         self.optim = (
-            tf.train.GradientDescentOptimizer(learning_rate=0.1)
+            tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate)
             .minimize(self.loss, var_list=tf.get_collection(key='model'))
             )
         self.sess.run(tf.global_variables_initializer())
@@ -157,20 +147,19 @@ def data():
     x = []
     # [x.append[i] for i in range(-2, 0.1, 2)]
     # num_samp = 10\
-    xv = np.linspace(0, 1, 20)
-    yv = np.linspace(0, 1, 20)    
+    xv = np.linspace(0, 1, 50)
+    yv = np.linspace(0, 1, 50)    
     # xx, yy = np.meshgrid(x, y)
     for x in xv: 
         for y in yv: 
             # true solution:
-            # z =  np.sin(np.pi*x)*( np.exp(np.pi*y) - np.exp(-np.pi*y) ) /(np.exp(np.pi - np.exp(-np.pi)))
             z = np.sin(np.pi*x)*np.sinh(np.pi*y)/(np.sinh(np.pi))
             # assume Dirichlet BCs
             dz = 0
             yield x, y, z, dz
 
 sess = tf.Session()
-model = Model(sess, data, nEpochs=80, learning_rate=1e-3, lambduh=1e-4, batch_size = 5)
+model = Model(sess, data, nEpochs=120, learning_rate=1e-2, lambduh=1e-3, batch_size = 40)
 model.train_init()
 model.train()
 
@@ -181,15 +170,9 @@ for x, y, z, dz in data():
 
 model.eval(test)
     
-# print(sess.run(tf.get_collection('model_variables')))
 
-# generate manifold and plot
-
-#debugger
-# pdb.Pdb().set_trace()
-
-x= np.linspace(0, 1, 20)
-y= np.linspace(0, 1, 20)
+x= np.linspace(0, 1, 50)
+y= np.linspace(0, 1, 50)
 
 
 test = []
@@ -239,7 +222,6 @@ ay.set_ylabel('MSE Loss')
 plt.suptitle('Loss during training')
 plt.plot(x, model.loss_tracker)
 
-# print(np.shapez(model.testresults))
 
 
 fig = plt.figure()
@@ -253,15 +235,14 @@ error = [x[2] for x in model.testresults]
 # # xx, yy = np.meshgrid(xval, yval)
 # # error = np.reshape(error, np.shape(xval))
 
-x= np.linspace(0, 1, 20)
-y= np.linspace(0, 1, 20)
+x= np.linspace(0, 1, 50)
+y= np.linspace(0, 1, 50)
 
 xx, yy = np.meshgrid(x, y)
 error = np.reshape(error, np.shape(xx))
 
 
 bx.plot_surface(xx, yy, error)
-# # print(model.testresults)
 
 
 # plt.xlim([0, 1])
@@ -269,14 +250,14 @@ bx.plot_surface(xx, yy, error)
 bx.set_xlabel('x')
 bx.set_ylabel('y')
 bx.set_zlabel('error of z')
-plt.title('Error Plot, Average Error: {:.7f}, Max Error: {:.7f}'.format(np.mean(np.absolute(error)) , 
+plt.title('Error Plot, MSE: {:.7f}, Max Error: {:.7f}'.format(np.mean(np.absolute(error)) , 
                                                                         np.max(np.absolute(error))))
 plt.tight_layout()
 plt.savefig('errorplot.pdf', format='pdf', bbox_inches='tight')
 
 plt.figure()
 cp = plt.contourf(xx, yy, error)
-plt.title('Error Plot, Average Error: {:.7f}, Max Error: {:.7f}'.format(np.mean(np.absolute(error)) , 
+plt.title('Error Plot, MSE: {:.7f}, Max Error: {:.7f}'.format(np.mean(np.absolute(error)) , 
                                                                         np.max(np.absolute(error))))
 plt.xlabel('x')
 plt.ylabel('y')
